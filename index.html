@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>위상반전 실험실</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060a08;
+    --panel: #0d1712;
+    --panel-2: #0a120e;
+    --grid: #16261e;
+    --mic: #52e08a;
+    --out: #ffb454;
+    --text: #d9ede0;
+    --muted: #6f8c7c;
+    --warn: #ff6f6f;
+    --warn-bg: #201010;
+    --accent: #52e08a;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: inherit; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  body {
+    padding: 18px 16px 28px;
+    max-width: 640px;
+    margin: 0 auto;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  header { margin-bottom: 16px; }
+  .kicker {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+    margin: 0 0 4px;
+  }
+  h1 {
+    font-size: 21px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+  .sub {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--grid);
+    border-radius: 3px;
+    padding: 14px;
+    margin-top: 14px;
+  }
+
+  .scope-wrap { padding: 10px 10px 12px; }
+  .scope-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .legend { display: flex; gap: 14px; font-size: 11.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.mic { background: var(--mic); }
+  .dot.out { background: var(--out); }
+  .status {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .status.live { color: var(--accent); }
+  canvas#scope {
+    width: 100%;
+    height: 150px;
+    display: block;
+    background: var(--panel-2);
+    border-radius: 2px;
+  }
+
+  .readouts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--grid);
+    margin-top: 12px;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .readout {
+    background: var(--panel-2);
+    padding: 10px 12px;
+  }
+  .readout .label { font-size: 10.5px; color: var(--muted); margin-bottom: 4px; }
+  .readout .value { font-size: 17px; color: var(--text); font-weight: 600; }
+  .readout .value.small { font-size: 13px; font-weight: 500; }
+
+  .controls { margin-top: 14px; }
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 2px;
+    border-bottom: 1px solid var(--grid);
+  }
+  .row:last-child { border-bottom: none; }
+  .row .rlabel { font-size: 13px; color: var(--text); min-width: 92px; }
+  .row .rval { font-size: 12px; color: var(--muted); min-width: 54px; text-align: right; }
+  input[type=range] {
+    flex: 1;
+    accent-color: var(--accent);
+    height: 20px;
+  }
+
+  .switch {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    background: var(--grid);
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .switch.on { background: rgba(82,224,138,0.18); }
+  .switch.on::after { background: var(--accent); transform: translateX(18px); }
+
+  .btnrow { display: flex; gap: 8px; margin-top: 14px; }
+  button.big {
+    flex: 1;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 13px 10px;
+    border-radius: 3px;
+    border: 1px solid var(--grid);
+    background: var(--panel-2);
+    color: var(--text);
+    cursor: pointer;
+  }
+  button.big.primary {
+    background: var(--accent);
+    color: #06120a;
+    border-color: var(--accent);
+  }
+  button.big.stop {
+    background: var(--warn-bg);
+    color: var(--warn);
+    border-color: #3a1a1a;
+  }
+  button.big:disabled { opacity: 0.4; cursor: default; }
+  button.ghost {
+    width: 100%;
+    margin-top: 8px;
+    font-family: inherit;
+    font-size: 12.5px;
+    padding: 10px;
+    border-radius: 3px;
+    border: 1px dashed var(--grid);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  button.ghost:disabled { opacity: 0.4; cursor: default; }
+
+  .warn {
+    background: var(--warn-bg);
+    border: 1px solid #3a1a1a;
+    color: #ffb3b3;
+    font-size: 12px;
+    line-height: 1.6;
+    padding: 12px 13px;
+    border-radius: 3px;
+    margin-top: 14px;
+  }
+  .warn b { color: var(--warn); }
+
+  .note {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-top: 14px;
+    padding-top: 2px;
+  }
+  .note b { color: var(--text); font-weight: 600; }
+
+  footer {
+    margin-top: 20px;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  @media (max-width: 380px) {
+    .row .rlabel { min-width: 78px; font-size: 12.5px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="kicker">WEB AUDIO 실험</p>
+  <h1>위상반전 실험실</h1>
+  <p class="sub">마이크로 들어오는 소리를 실시간으로 뒤집어서(위상반전) 스피커로 내보냅니다. 화면 아래에서 실제 왕복 지연시간도 측정할 수 있어요 — 왜 완전한 소음상쇄가 안 되는지 숫자로 확인 가능.</p>
+</header>
+
+<div class="panel scope-wrap">
+  <div class="scope-head">
+    <div class="legend">
+      <span><i class="dot mic"></i>마이크 입력</span>
+      <span><i class="dot out"></i>반전 출력</span>
+    </div>
+    <div class="status" id="status">대기중</div>
+  </div>
+  <canvas id="scope"></canvas>
+
+  <div class="readouts">
+    <div class="readout">
+      <div class="label">시스템 레이턴시 (추정)</div>
+      <div class="value small" id="sysLatency">—</div>
+    </div>
+    <div class="readout">
+      <div class="label">실측 왕복 지연</div>
+      <div class="value" id="measuredLatency">— ms</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel controls">
+  <div class="row">
+    <span class="rlabel">위상반전</span>
+    <button class="switch on" id="invertSwitch" aria-label="위상반전 켜기/끄기"></button>
+  </div>
+  <div class="row">
+    <span class="rlabel">출력 볼륨</span>
+    <input type="range" id="gainSlider" min="0" max="100" value="15">
+    <span class="rval" id="gainVal">15%</span>
+  </div>
+  <div class="row">
+    <span class="rlabel">지연 보정</span>
+    <input type="range" id="delaySlider" min="0" max="100" value="0">
+    <span class="rval" id="delayVal">0 ms</span>
+  </div>
+</div>
+
+<div class="btnrow">
+  <button class="big primary" id="startBtn">마이크 시작</button>
+  <button class="big stop" id="stopBtn" disabled>정지</button>
+</div>
+<button class="ghost" id="measureBtn" disabled>실제 왕복 지연시간 측정</button>
+
+<div class="warn">
+  <b>주의:</b> 마이크와 스피커가 서로 가까우면 되먹임(하울링)이 생길 수 있어요. 이어폰 사용을 권장하고, 처음엔 출력 볼륨을 낮게 두고 천천히 올리세요. 날카로운 소리가 나면 바로 정지하세요.
+</div>
+
+<div class="note">
+  <b>왜 완전히 상쇄되지 않을까</b><br>
+  화면 위 실측값이 곧 답입니다. 폰 마이크 → 처리 → 스피커까지 걸리는 시간은 보통 수십 ms. 사람이 듣는 소리 대부분(수백 Hz 이상)은 한 주기가 몇 ms밖에 안 되기 때문에, 반전된 파형이 도착했을 땐 이미 원래 소리가 지나간 뒤예요. 그래서 진짜 자동차 ANC는 헤드레스트에 마이크를 박고 전용 저지연 칩으로 처리합니다 — 이 실험은 그 이유를 몸으로 느껴보는 용도예요.
+</div>
+
+<footer>Web Audio API · 마이크 데이터는 기기 밖으로 전송되지 않습니다</footer>
+
+<script>
+(function(){
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const measureBtn = document.getElementById('measureBtn');
+  const invertSwitch = document.getElementById('invertSwitch');
+  const gainSlider = document.getElementById('gainSlider');
+  const gainVal = document.getElementById('gainVal');
+  const delaySlider = document.getElementById('delaySlider');
+  const delayVal = document.getElementById('delayVal');
+  const statusEl = document.getElementById('status');
+  const sysLatencyEl = document.getElementById('sysLatency');
+  const measuredLatencyEl = document.getElementById('measuredLatency');
+  const canvas = document.getElementById('scope');
+  const ctx2d = canvas.getContext('2d');
+
+  let audioCtx, micStream, source, delayNode, inverterNode, masterGain;
+  let analyserIn, analyserOut;
+  let recorderNode;
+  let running = false;
+  let rafId = null;
+  let invertOn = true;
+  let recentPeaks = []; // {t, peak} during latency test
+  let capturing = false;
+
+  function resizeCanvas(){
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  function drawGrid(w, h){
+    ctx2d.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
+    ctx2d.lineWidth = 1;
+    ctx2d.beginPath();
+    ctx2d.moveTo(0, h/2); ctx2d.lineTo(w, h/2);
+    for (let x = 0; x <= w; x += w/8) { ctx2d.moveTo(x, 0); ctx2d.lineTo(x, h); }
+    ctx2d.stroke();
+  }
+
+  function drawTrace(analyser, color, w, h){
+    const bufferLength = analyser.fftSize;
+    const data = new Uint8Array(bufferLength);
+    analyser.getByteTimeDomainData(data);
+    ctx2d.beginPath();
+    ctx2d.strokeStyle = color;
+    ctx2d.lineWidth = 1.6;
+    const slice = w / bufferLength;
+    let x = 0;
+    for (let i = 0; i < bufferLength; i++){
+      const v = data[i] / 128.0;
+      const y = (v * h) / 2;
+      if (i === 0) ctx2d.moveTo(x, y); else ctx2d.lineTo(x, y);
+      x += slice;
+    }
+    ctx2d.stroke();
+  }
+
+  function loop(){
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    ctx2d.clearRect(0, 0, w, h);
+    drawGrid(w, h);
+    if (analyserIn) drawTrace(analyserIn, getComputedStyle(document.documentElement).getPropertyValue('--mic').trim(), w, h);
+    if (analyserOut) drawTrace(analyserOut, getComputedStyle(document.documentElement).getPropertyValue('--out').trim(), w, h);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  async function start(){
+    try {
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Mic requires HTTPS');
+      }
+
+      // iOS Safari: keep permission request directly inside the button's user gesture.
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
+
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      await audioCtx.resume();
+      await audioCtx.audioWorklet.addModule('./worklet.js');
+
+      source = audioCtx.createMediaStreamSource(micStream);
+      delayNode = audioCtx.createDelay(1.0);
+      delayNode.delayTime.value = (parseFloat(delaySlider.value) || 0) / 1000;
+
+      inverterNode = new AudioWorkletNode(audioCtx, 'inverter');
+      inverterNode.port.postMessage({ invert: invertOn });
+
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = (parseFloat(gainSlider.value) || 0) / 100;
+
+      analyserIn = audioCtx.createAnalyser();
+      analyserIn.fftSize = 1024;
+      analyserOut = audioCtx.createAnalyser();
+      analyserOut.fftSize = 1024;
+
+      recorderNode = new AudioWorkletNode(audioCtx, 'recorder');
+      const sink = audioCtx.createGain();
+      sink.gain.value = 0;
+      recorderNode.connect(sink).connect(audioCtx.destination);
+      recorderNode.port.onmessage = (e) => {
+        if (capturing) recentPeaks.push(e.data);
+      };
+
+      source.connect(analyserIn);
+      source.connect(recorderNode);
+      source.connect(delayNode);
+      delayNode.connect(inverterNode);
+      inverterNode.connect(analyserOut);
+      inverterNode.connect(masterGain);
+      masterGain.connect(audioCtx.destination);
+
+      const base = (audioCtx.baseLatency || 0) * 1000;
+      const out = (audioCtx.outputLatency || 0) * 1000;
+      sysLatencyEl.textContent = (base + out).toFixed(1) + ' ms (참고용)';
+
+      resizeCanvas();
+      running = true;
+      statusEl.textContent = '● 실시간 처리중';
+      statusEl.classList.add('live');
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      measureBtn.disabled = false;
+      loop();
+    } catch (err) {
+      statusEl.textContent = '마이크 권한 필요';
+      statusEl.classList.remove('live');
+      console.error(err);
+      const msg = !window.isSecureContext
+        ? '아이폰에서는 HTTPS 주소에서만 마이크를 사용할 수 있어요. GitHub Pages 주소로 열어주세요.'
+        : '마이크 접근이 거부되었어요. iPhone 설정 → Safari → 마이크 또는 웹사이트 설정에서 허용한 뒤 페이지를 다시 열어주세요.';
+      alert(msg);
+    }
+  }
+
+  function stop(){
+    running = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    if (micStream) micStream.getTracks().forEach(t => t.stop());
+    if (audioCtx) audioCtx.close();
+    audioCtx = null;
+    statusEl.textContent = '정지됨';
+    statusEl.classList.remove('live');
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    measureBtn.disabled = true;
+    measuredLatencyEl.textContent = '— ms';
+    sysLatencyEl.textContent = '—';
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    ctx2d.clearRect(0, 0, w, h);
+    if (w) { resizeCanvas(); drawGrid(w, h); }
+  }
+
+  async function measureLatency(){
+    if (!audioCtx || !running) return;
+    measureBtn.disabled = true;
+    measureBtn.textContent = '측정중… (조용히 해주세요)';
+
+    const prevGain = masterGain.gain.value;
+    masterGain.gain.value = 0; // avoid the invert path interfering with the test
+
+    recentPeaks = [];
+    capturing = true;
+
+    // baseline noise floor, first ~120ms
+    await new Promise(r => setTimeout(r, 150));
+    const baseline = recentPeaks.length
+      ? recentPeaks.reduce((s, p) => s + p.peak, 0) / recentPeaks.length
+      : 0.01;
+    recentPeaks = [];
+
+    const t0 = audioCtx.currentTime + 0.08;
+    const osc = audioCtx.createOscillator();
+    const clickGain = audioCtx.createGain();
+    osc.frequency.value = 3200;
+    clickGain.gain.setValueAtTime(0, t0);
+    clickGain.gain.linearRampToValueAtTime(0.9, t0 + 0.002);
+    clickGain.gain.linearRampToValueAtTime(0, t0 + 0.02);
+    osc.connect(clickGain).connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + 0.03);
+
+    await new Promise(r => setTimeout(r, 700));
+    capturing = false;
+
+    const threshold = Math.max(baseline * 3, 0.02);
+    const hit = recentPeaks.find(p => p.t >= t0 && p.peak > threshold);
+
+    masterGain.gain.value = prevGain;
+    measureBtn.disabled = false;
+    measureBtn.textContent = '실제 왕복 지연시간 측정';
+
+    if (hit) {
+      const ms = (hit.t - t0) * 1000;
+      measuredLatencyEl.textContent = ms.toFixed(1) + ' ms';
+    } else {
+      measuredLatencyEl.textContent = '감지 실패';
+    }
+  }
+
+  startBtn.addEventListener('click', start);
+  stopBtn.addEventListener('click', stop);
+  measureBtn.addEventListener('click', measureLatency);
+
+  invertSwitch.addEventListener('click', () => {
+    invertOn = !invertOn;
+    invertSwitch.classList.toggle('on', invertOn);
+    if (inverterNode) inverterNode.port.postMessage({ invert: invertOn });
+  });
+
+  gainSlider.addEventListener('input', () => {
+    gainVal.textContent = gainSlider.value + '%';
+    if (masterGain) masterGain.gain.value = parseFloat(gainSlider.value) / 100;
+  });
+
+  delaySlider.addEventListener('input', () => {
+    delayVal.textContent = delaySlider.value + ' ms';
+    if (delayNode) delayNode.delayTime.value = parseFloat(delaySlider.value) / 1000;
+  });
+
+  // initial static grid
+  window.addEventListener('load', () => {
+    resizeCanvas();
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    drawGrid(w, h);
+  });
+})();
+</script>
+
+</body>
+</html>
